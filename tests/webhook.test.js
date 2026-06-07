@@ -98,6 +98,29 @@ describe('POST /webhook', () => {
     const check = await request(app).get(`/invoice/${invoiceId}`);
     expect(check.body.status).toBe('paid');
   });
+
+	it('should handle concurrent webhooks without double processing', async () => {
+    const invoice = await request(app)
+      .post('/invoice')
+      .send({ amount: 300, merchantId: 'merchant_001' });
+    
+    const payload = { invoiceId: invoice.body.invoiceId, status: 'paid' };
+    
+    // Два webhook летят одновременно
+    const [res1, res2] = await Promise.all([
+      request(app).post('/webhook').set(createSignatureHeaders(payload)).send(payload),
+      request(app).post('/webhook').set(createSignatureHeaders(payload)).send(payload)
+    ]);
+    
+    // Один обработан, второй — already processed
+    const messages = [res1.body.message, res2.body.message];
+    expect(messages).toContain('Already processed');
+    expect(messages).toContain('Webhook processed successfully');
+    
+    // Статус paid, оплата зачислена ровно один раз
+    const check = await request(app).get(`/invoice/${invoice.body.invoiceId}`);
+    expect(check.body.status).toBe('paid');
+  });
   
   it('should reject webhook with invalid signature', async () => {
     const payload = { invoiceId: 'test-123', status: 'paid' };
