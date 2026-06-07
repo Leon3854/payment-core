@@ -2,7 +2,22 @@ const express = require('express');
 const router = express.Router();
 const invoiceService = require('../services/invoiceService');
 
-// POST /invoice
+/**
+ * @route POST /invoice
+ * @group Invoices - Операции с инвойсами
+ * @summary Создание нового инвойса
+ * @param {Object} req - Объект запроса Express.
+ * @param {Object} req.body - Данные тела запроса.
+ * @param {number} req.body.amount - Сумма инвойса в копейках (должна быть строго больше 0).
+ * @param {string} [req.body.currency='RUB'] - Валюта инвойса.
+ * @param {string} req.body.merchantId - Идентификатор мерчанта (продавца).
+ * @param {Object} res - Объект ответа Express.
+ * @returns {Promise<void>}
+ * 
+ * @throws {Object} 400 - Ошибка валидации: отсутствуют обязательные поля или сумма некорректна.
+ * @throws {Object} 404 - Ошибка: мерчант с указанным идентификатором не найден.
+ * @throws {Object} 500 - Внутренняя ошибка сервера.
+ */
 router.post('/', async (req, res) => {
   try {
     const { amount, currency, merchantId } = req.body;
@@ -31,7 +46,19 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /invoice/:id
+/**
+ * @route GET /invoice/:id
+ * @group Invoices - Операции с инвойсами
+ * @summary Получение инвойса по его уникальному ID
+ * @param {Object} req - Объект запроса Express.
+ * @param {Object} req.params - Параметры пути (URL).
+ * @param {string} req.params.id - Идентификатор инвойса (invoiceId).
+ * @param {Object} res - Объект ответа Express.
+ * @returns {Promise<void>}
+ * 
+ * @throws {Object} 404 - Ошибка: инвойс с указанным ID не найден в системе.
+ * @throws {Object} 500 - Внутренняя ошибка сервера.
+ */
 router.get('/:id', async (req, res) => {
   try {
     const invoice = await invoiceService.getInvoice(req.params.id);
@@ -47,4 +74,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+/**
+ * Роутер Express для обработки HTTP-запросов, связанных с инвойсами.
+ * @type {import('express').Router}
+ */
 module.exports = router;
