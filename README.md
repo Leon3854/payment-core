@@ -52,7 +52,7 @@ macOS: brew install redis
 ```
 
 **Запуск*
-- Создайте файл .env на основе .env.example
+- Удалите расширение .you а файле .env
 
 **Запустите MongoDB и Redis**
 ```bash
