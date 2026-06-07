@@ -120,6 +120,12 @@ npm test
 
 - Nonce действителен 1 час
 
+
+## Сверх требований
+- JSDoc на всех методах
+- .env.you для удобной настройки(убрать расширение .you)
+- REQUIREMENTS.md отдельным файлом(ТЗ)
+
 **Структура проекта:**
 ```text
 payment-core060626/
@@ -141,9 +147,10 @@ payment-core060626/
 │   ├── setup.js
 │   ├── invoice.test.js
 │   └── webhook.test.js
-├── .env
+├── .env.you
 ├── package.json
 ├── jest.config.js
+├── REQUIREMENTS.md
 └── README.md
 ```
 
