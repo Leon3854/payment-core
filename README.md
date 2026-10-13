@@ -1,77 +1,65 @@
-# payment-core
+# Payment Core
 
-## Решение с MongoDB для РФ
-Вместо Atlas (который заблокирован) используем MongoDB локально. Установка простая:
+Платёжный микросервис на Node.js: создание счетов, расчёт комиссии, приём webhook с проверкой подписи и защитой от повторных атак.
 
-**На Ubuntu/Debian:**
-```bash
-# Импорт ключа и установка
-wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | sudo apt-key add -
-echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-sudo apt-get update
-sudo apt-get install -y mongodb-org
-sudo systemctl start mongod
-```
-**На macOS:** - использовал для установки на m1
-```bash
-brew tap mongodb/brew
-brew install mongodb-community@7.0
-brew services start mongodb-community
-```
-**На Windows:** <br/>
-Скачать с официального сайта и установить как службу. **Доступ для пользователей РФ заблокирован**
-```text
-https://www.mongodb.com/try/download/community
-```
+![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=node.js)
+![Express](https://img.shields.io/badge/Express-4-000000?style=for-the-badge&logo=express)
+![MongoDB](https://img.shields.io/badge/MongoDB-8-47A248?style=for-the-badge&logo=mongodb)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis)
+![Jest](https://img.shields.io/badge/Jest-29-C21325?style=for-the-badge&logo=jest)
 
-**Установка:**
+## Что это
+
+Изолированное «финтех-ядро» для приёма платежей: счёт создаётся с расчётом комиссии, статус оплаты приходит через подписанный webhook. Все денежные расчёты ведутся в минимальных денежных единицах (копейки/центы) целыми числами — без ошибок округления float.
+
+## Возможности
+
+- **Создание счёта** с расчётом комиссии от суммы и валюты
+- **Проверка подписи webhook** — HMAC по заголовкам `X-Signature` / `X-Timestamp`
+- **Защита от replay-атак** — nonce с TTL в Redis, окно валидности 5 минут
+- **Идемпотентность** — повторный webhook по оплаченному счёту отвечает `200 Already processed`
+- **Изоляция для тестов** — MongoDB Memory Server + `ioredis-mock`, сеть не трогается
+
+## Стек
+
+Express · Mongoose (MongoDB) · ioredis (Redis) · JSDoc · Jest + Supertest
+
+## Быстрый старт
+
+**Требования:** Node.js 18+, MongoDB 7, Redis
+
 ```bash
+# 1. Установить зависимости
 npm install
-```
-**Требования**
-- > Node.js 18+
 
-- > MongoDB 7.0 (локально)
+# 2. Настроить окружение: скопировать .env.example в .env и заполнить
+cp .env.example .env
 
-- > Redis (локально)
+# 3. Поднять MongoDB и Redis локально
 
-**Установка MongoDB:**
-```text
-Ubuntu: sudo apt install mongodb-org
-
-macOS: brew install mongodb-community
-
-Windows: скачать с mongodb.com
-```
-
-**Установка Redis:**
-```text
-Ubuntu: sudo apt install redis-server
-
-macOS: brew install redis
-```
-
-**Запуск*
-- Удалите расширение .you а файле .env
-
-**Запустите MongoDB и Redis**
-```bash
+# 4. Запустить
 npm start
 ```
-**Результат выполнения команды:**
-```text
-> payment-service@1.0.0 start
-> node src/app.js
 
+Ожидаемый вывод:
+
+```text
 Connected to MongoDB
 Server running on port 3000
 ```
 
-## API Endpoints
-- > POST /invoice
+## API
 
-Создание счёта:
-```text
+| Метод | Путь | Описание |
+|---|---|---|
+| `POST` | `/invoice` | Создание счёта |
+| `POST` | `/webhook` | Приём статуса оплаты (подпись HMAC) |
+| `GET` | `/invoice/:id` | Получение статуса счёта |
+
+**Создание счёта:**
+
+```json
+POST /invoice
 {
   "amount": 100.00,
   "currency": "RUB",
@@ -79,105 +67,45 @@ Server running on port 3000
 }
 ```
 
-- > POST /webhook
-Приём статуса оплаты<br/>
-Headers: X-Signature, X-Timestamp, X-Nonce
-```text
+**Webhook** — заголовки `X-Signature`, `X-Timestamp`, `X-Nonce`:
+
+```json
+POST /webhook
 {
   "invoiceId": "...",
   "status": "paid"
 }
 ```
 
-- > GET /invoice/:id
-Получение статуса счёта
-
-
-**Тесты**
+## Тесты
 
 ```bash
 npm test
 ```
 
-**результат выполнения команды:**
+## Структура
 
-   <p align="center">
-  		<img src="./test01.png" alt="Результат выполнения команды" width="600"/>
-   </p>
-
-
-**Допущения**
-
-- Комиссия хранится в конфигурации (в реальном проекте в БД)
-
-- Для тестов используется MongoDB Memory Server
-
-- Для тестов Redis мокается через ioredis-mock
-- В системе принято допущение, что все финансовые расчеты внутри базы данных ведутся строго в минимальных денежных единицах (копейках/центах) в формате Integer, чтобы избежать ошибок округления чисел с плавающей точкой (Float) в JavaScript
-- Для защиты от атак повторения (Replay attacks) используется кэш Redis со сроком жизни nonce в 1 час. Предполагается, что время на сервере платежной системы и нашем сервере синхронизировано (допустимое окно — 5 минут)
-- В рамках выполнения работы аутентификация мерчантов при создании инвойса упрощена: мы доверяем merchantId из тела запроса. В реальном продакшене этот запрос должен быть закрыт авторизационным токеном (Bearer JWT)
-- Если вебхук пришел повторно для уже оплаченного счета, система отвечает статусом 200 и сообщением "Already processed", обеспечивая тем самым свойство идемпотентности
-
-
-## Сверх требований
-- JSDoc на всех методах
-- .env.you для удобной настройки(убрать расширение .you)
-- REQUIREMENTS.md отдельным файлом(ТЗ)
-
-**Структура проекта:**
 ```text
-payment-core060626/
-├── src/
-│   ├── config/
-│   │   └── merchants.js
-│   ├── models/
-│   │   └── Invoice.js
-│   ├── services/
-│   │   ├── invoiceService.js
-│   │   └── webhookService.js
-│   ├── routes/
-│   │   ├── invoice.js
-│   │   └── webhook.js
-│   ├── utils/
-│   │   └── currency.js
-│   └── app.js
-├── tests/
-│   ├── setup.js
-│   ├── invoice.test.js
-│   └── webhook.test.js
-├── .env.you
-├── package.json
-├── jest.config.js
-├── REQUIREMENTS.md
-└── README.md
+src/
+├── config/merchants.js        # конфигурация мерчантов и комиссий
+├── models/Invoice.js          # модель счёта (Mongoose)
+├── services/
+│   ├── invoiceService.js      # создание и расчёт счёта
+│   └── webhookService.js      # проверка подписи, nonce, идемпотентность
+├── routes/
+│   ├── invoice.js
+│   └── webhook.js
+├── utils/currency.js          # работа с минимальными единицами валют
+└── app.js                     # сборка Express-приложения
+tests/
+├── invoice.test.js
+└── webhook.test.js
 ```
 
+## Допущения
 
+- Комиссия хранится в конфигурации (в проде — в БД).
+- Аутентификация мерчанта упрощена: `merchantId` из тела запроса. В проде — Bearer JWT.
+- Предполагается синхронизация времени сервера с платёжной системой (окно webhook — 5 минут).
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Подробное ТЗ — в [`REQUIREMENTS.md`](REQUIREMENTS.md).

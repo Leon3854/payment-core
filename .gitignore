@@ -44,3 +44,7 @@ temp/
 dist/
 **/*.js.map
 **/*.d.ts
+
+# Legacy env names (keep ignored)
+.env.you
+.yourEnv
